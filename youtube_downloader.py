@@ -4,6 +4,12 @@ from pytube import YouTube
 from PIL import Image, ImageTk
 import io
 import requests
+import ssl
+import certifi
+
+# Ensure that the certifi certificates are used
+os.environ['SSL_CERT_FILE'] = certifi.where()
+
 
 class YouTubeDownloader(tk.Tk):
     def __init__(self):
