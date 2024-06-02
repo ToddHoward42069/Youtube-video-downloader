@@ -16,7 +16,7 @@ class YouTubeDownloader(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("YouTube Video Downloader")
-        self.geometry("500x400")
+        self.geometry("891x600")
         self.configure(bg="lightgray")
 
         self.url_label = tk.Label(self, text="YouTube URL:", bg="lightgray")
