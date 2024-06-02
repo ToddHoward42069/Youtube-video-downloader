@@ -1,15 +1,11 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from pytube import YouTube
+from pytube.exceptions import VideoUnavailable
 from PIL import Image, ImageTk
 import io
 import requests
-import ssl
-import certifi
-
-# Ensure that the certifi certificates are used
-os.environ['SSL_CERT_FILE'] = certifi.where()
-
+import os
 
 class YouTubeDownloader(tk.Tk):
     def __init__(self):
@@ -64,6 +60,8 @@ class YouTubeDownloader(tk.Tk):
             self.thumbnail_label.config(image=thumbnail)
             self.thumbnail_label.image = thumbnail
             messagebox.showinfo("Success", "Video fetched successfully")
+        except VideoUnavailable:
+            messagebox.showerror("Error", "This video is unavailable")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to fetch video: {e}")
 
@@ -95,6 +93,8 @@ class YouTubeDownloader(tk.Tk):
                 os.rename(output_path, new_file)
             
             messagebox.showinfo("Success", "Download completed")
+        except VideoUnavailable:
+            messagebox.showerror("Error", "This video is unavailable")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to download video: {e}")
 
