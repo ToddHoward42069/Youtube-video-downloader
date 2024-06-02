@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from pytube import YouTube
 from pytube.exceptions import VideoUnavailable
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageOps
 import io
 import requests
 import os
@@ -60,7 +60,7 @@ class YouTubeDownloader(tk.Tk):
             response = requests.get(self.video.thumbnail_url)
             image_data = response.content
             image = Image.open(io.BytesIO(image_data))
-            image = image.resize((320, 180), Image.ANTIALIAS)
+            image = image.resize((320, 180), Image.Resampling.LANCZOS)
             thumbnail = ImageTk.PhotoImage(image)
             self.thumbnail_label.config(image=thumbnail)
             self.thumbnail_label.image = thumbnail
