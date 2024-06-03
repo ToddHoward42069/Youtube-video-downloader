@@ -1,12 +1,15 @@
 # setup.py
 import sys
 from cx_Freeze import setup, Executable
+import os
 
-# Dependencies are automatically detected, but it might need fine tuning.
+# Path to the DLL file
+dll_path = 'C:\\Windows\\System32\\VCRUNTIME140.dll'
+
 build_exe_options = {
     "packages": ["os", "tkinter", "pytube", "PIL", "requests", "certifi"],
     "excludes": [],
-    "include_files": []
+    "include_files": [dll_path]
 }
 
 base = None
