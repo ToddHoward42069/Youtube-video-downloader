@@ -1,0 +1,3 @@
+- option to input text file
+- option to automatically create a new folder
+- make UI better
