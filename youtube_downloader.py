@@ -1,8 +1,8 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from pytube import YouTube
 from pytube.exceptions import VideoUnavailable
-from PIL import Image, ImageTk, ImageOps
+from PIL import Image, ImageTk
 import io
 import requests
 import os
@@ -24,10 +24,11 @@ class YouTubeDownloader(tk.Tk):
         
         self.url_entry = tk.Entry(self, width=50)
         self.url_entry.pack(pady=10)
-        
-        self.fetch_button = tk.Button(self, text="Fetch Video", command=self.fetch_video)
-        self.fetch_button.pack(pady=10)
-        
+        self.url_entry.bind("<KeyRelease>", self.delayed_fetch)
+
+        self.status_label = tk.Label(self, text="", bg="lightgray")
+        self.status_label.pack(pady=10)
+
         self.thumbnail_label = tk.Label(self, bg="lightgray")
         self.thumbnail_label.pack(pady=10)
         
@@ -48,11 +49,17 @@ class YouTubeDownloader(tk.Tk):
         
         self.download_location = ""
         self.video = None
+        self.fetch_job = None
+
+    def delayed_fetch(self, event):
+        if self.fetch_job is not None:
+            self.after_cancel(self.fetch_job)
+        self.fetch_job = self.after(1000, self.fetch_video)
 
     def fetch_video(self):
         url = self.url_entry.get()
         if not url:
-            messagebox.showwarning("Input Error", "Please enter a YouTube URL")
+            self.status_label.config(text="Please enter a YouTube URL", fg="red")
             return
         
         try:
@@ -64,24 +71,24 @@ class YouTubeDownloader(tk.Tk):
             thumbnail = ImageTk.PhotoImage(image)
             self.thumbnail_label.config(image=thumbnail)
             self.thumbnail_label.image = thumbnail
-            messagebox.showinfo("Success", "Video fetched successfully")
+            self.status_label.config(text="Video fetched successfully", fg="green")
         except VideoUnavailable:
-            messagebox.showerror("Error", "This video is unavailable")
+            self.status_label.config(text="This video is unavailable", fg="red")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to fetch video: {e}")
+            self.status_label.config(text=f"Failed to fetch video: {e}", fg="red")
 
     def select_location(self):
         self.download_location = filedialog.askdirectory()
         if self.download_location:
-            messagebox.showinfo("Success", f"Download location set to: {self.download_location}")
+            self.status_label.config(text=f"Download location set to: {self.download_location}", fg="green")
 
     def download_video(self):
         if not self.video:
-            messagebox.showwarning("Error", "No video fetched to download")
+            self.status_label.config(text="No video fetched to download", fg="red")
             return
 
         if not self.download_location:
-            messagebox.showwarning("Error", "Please select a download location")
+            self.status_label.config(text="Please select a download location", fg="red")
             return
 
         try:
@@ -97,11 +104,11 @@ class YouTubeDownloader(tk.Tk):
                 new_file = f"{base}.mp3"
                 os.rename(output_path, new_file)
             
-            messagebox.showinfo("Success", "Download completed")
+            self.status_label.config(text="Download completed", fg="green")
         except VideoUnavailable:
-            messagebox.showerror("Error", "This video is unavailable")
+            self.status_label.config(text="This video is unavailable", fg="red")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to download video: {e}")
+            self.status_label.config(text=f"Failed to download video: {e}", fg="red")
 
 if __name__ == "__main__":
     app = YouTubeDownloader()
