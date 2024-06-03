@@ -1,2 +1,3 @@
 - refactoring if possible TwT
 - Make it German
+- progress bar
