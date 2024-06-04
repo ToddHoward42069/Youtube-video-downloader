@@ -26,10 +26,10 @@ class YouTubeDownloader(tk.Tk):
         # URL Frame
         self.url_frame = tk.Frame(self, bg="#2b2b2b")
         self.url_frame.pack(pady=10)
-        
+
         self.url_label = tk.Label(self.url_frame, text="YouTube URL:", font=("Helvetica", 12), bg="#2b2b2b", fg="white")
         self.url_label.pack(side=tk.LEFT, padx=10)
-        
+
         self.url_entry = tk.Entry(self.url_frame, width=40, font=("Helvetica", 12))
         self.url_entry.pack(side=tk.LEFT, padx=10)
         self.url_entry.bind("<KeyRelease>", self.delayed_fetch)
@@ -47,10 +47,10 @@ class YouTubeDownloader(tk.Tk):
         # Format Frame
         self.format_frame = tk.Frame(self, bg="#2b2b2b")
         self.format_frame.pack(pady=10)
-        
+
         self.format_label = tk.Label(self.format_frame, text="Select Format:", font=("Helvetica", 12), bg="#2b2b2b", fg="white")
         self.format_label.pack(side=tk.LEFT, padx=10)
-        
+
         self.format_var = tk.StringVar(value="mp4")
         self.mp4_radio = tk.Radiobutton(self.format_frame, text="MP4", variable=self.format_var, value="mp4", font=("Helvetica", 12), bg="#2b2b2b", fg="white", selectcolor="#2b2b2b")
         self.mp3_radio = tk.Radiobutton(self.format_frame, text="MP3", variable=self.format_var, value="mp3", font=("Helvetica", 12), bg="#2b2b2b", fg="white", selectcolor="#2b2b2b")
@@ -68,7 +68,7 @@ class YouTubeDownloader(tk.Tk):
         # Download from File Button
         self.file_download_button = tk.Button(self, text="Download from File", font=("Helvetica", 12), bg="#f44336", fg="white", command=self.download_from_file)
         self.file_download_button.pack(pady=10)
-        
+
         self.download_location = ""
         self.video = None
         self.fetch_job = None
@@ -88,7 +88,7 @@ class YouTubeDownloader(tk.Tk):
         if not url:
             self.status_label.config(text="Please enter a YouTube URL", fg="red")
             return
-        
+
         try:
             self.video = YouTube(url)
             response = requests.get(self.video.thumbnail_url)
@@ -127,13 +127,13 @@ class YouTubeDownloader(tk.Tk):
                 stream = self.video.streams.get_highest_resolution()
             elif format_choice == "mp3":
                 stream = self.video.streams.filter(only_audio=True).first()
-            
+
             output_path = stream.download(output_path=download_location)
             if format_choice == "mp3":
                 base, ext = output_path.rsplit('.', 1)
                 new_file = f"{base}.mp3"
                 os.rename(output_path, new_file)
-            
+
             self.status_label.config(text="Download completed", fg="green")
         except VideoUnavailable:
             self.status_label.config(text="This video is unavailable", fg="red")
@@ -161,7 +161,7 @@ class YouTubeDownloader(tk.Tk):
                             stream = video.streams.get_highest_resolution()
                         elif format_choice == "mp3":
                             stream = video.streams.filter(only_audio=True).first()
-                        
+
                         output_path = stream.download(output_path=download_location)
                         if format_choice == "mp3":
                             base, ext = output_path.rsplit('.', 1)
