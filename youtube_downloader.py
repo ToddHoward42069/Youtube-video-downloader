@@ -1,11 +1,14 @@
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import ttk
 from pytube import YouTube
 from pytube.exceptions import VideoUnavailable
 from PIL import Image, ImageTk
 import io
 import requests
 import os
+import threading
+import time
 import ssl
 import certifi
 
@@ -16,7 +19,7 @@ class YouTubeDownloader(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("YouTube Video Downloader")
-        self.geometry("600x650")
+        self.geometry("600x700")
         self.configure(bg="#2b2b2b")
 
         # Title Label
@@ -62,16 +65,33 @@ class YouTubeDownloader(tk.Tk):
         self.location_button.pack(pady=10)
 
         # Download Button
-        self.download_button = tk.Button(self, text="Download", font=("Helvetica", 12), bg="#008CBA", fg="white", command=self.download_video)
+        self.download_button = tk.Button(self, text="Download", font=("Helvetica", 12), bg="#008CBA", fg="white", command=self.start_download_thread)
         self.download_button.pack(pady=10)
 
         # Download from File Button
-        self.file_download_button = tk.Button(self, text="Download from File", font=("Helvetica", 12), bg="#f44336", fg="white", command=self.download_from_file)
+        self.file_download_button = tk.Button(self, text="Download from File", font=("Helvetica", 12), bg="#f44336", fg="white", command=self.start_file_download_thread)
         self.file_download_button.pack(pady=10)
+
+        # Progress Bar
+        self.progress = ttk.Progressbar(self, orient="horizontal", length=400, mode="determinate")
+        self.progress.pack(pady=20)
+
+        # Additional Info Frame
+        self.info_frame = tk.Frame(self, bg="#2b2b2b")
+        self.info_frame.pack(pady=10)
+
+        self.speed_label = tk.Label(self.info_frame, text="Speed: 0 MB/s", font=("Helvetica", 12), bg="#2b2b2b", fg="white")
+        self.speed_label.pack(side=tk.LEFT, padx=10)
+
+        self.num_videos_label = tk.Label(self.info_frame, text="Videos: 0/0", font=("Helvetica", 12), bg="#2b2b2b", fg="white")
+        self.num_videos_label.pack(side=tk.LEFT, padx=10)
 
         self.download_location = ""
         self.video = None
         self.fetch_job = None
+        self.start_time = None
+        self.total_videos = 0
+        self.current_video = 0
 
     def select_all(self, event):
         self.url_entry.select_range(0, tk.END)
@@ -90,7 +110,7 @@ class YouTubeDownloader(tk.Tk):
             return
 
         try:
-            self.video = YouTube(url)
+            self.video = YouTube(url, on_progress_callback=self.progress_callback)
             response = requests.get(self.video.thumbnail_url)
             image_data = response.content
             image = Image.open(io.BytesIO(image_data))
@@ -114,6 +134,17 @@ class YouTubeDownloader(tk.Tk):
     def get_download_location(self):
         return self.download_location if self.download_location else os.getcwd()
 
+    def start_download_thread(self):
+        self.total_videos = 1
+        self.current_video = 0
+        self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}")
+        thread = threading.Thread(target=self.download_video)
+        thread.start()
+
+    def start_file_download_thread(self):
+        thread = threading.Thread(target=self.download_from_file)
+        thread.start()
+
     def download_video(self):
         if not self.video:
             self.status_label.config(text="No video fetched to download", fg="red")
@@ -128,17 +159,41 @@ class YouTubeDownloader(tk.Tk):
             elif format_choice == "mp3":
                 stream = self.video.streams.filter(only_audio=True).first()
 
-            output_path = stream.download(output_path=download_location)
+            self.progress["value"] = 0
+            self.start_time = time.time()
+            self.update_idletasks()
+
+            self.current_video += 1
+            self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}")
+
+            stream.download(output_path=download_location)
+
+            self.progress["value"] = 100
+            self.update_idletasks()
+
             if format_choice == "mp3":
                 base, ext = output_path.rsplit('.', 1)
                 new_file = f"{base}.mp3"
                 os.rename(output_path, new_file)
 
             self.status_label.config(text="Download completed", fg="green")
+            self.speed_label.config(text="Speed: 0 MB/s")
         except VideoUnavailable:
             self.status_label.config(text="This video is unavailable", fg="red")
         except Exception as e:
             self.status_label.config(text=f"Failed to download video: {e}", fg="red")
+
+    def progress_callback(self, stream, chunk, bytes_remaining):
+        total_size = stream.filesize
+        bytes_downloaded = total_size - bytes_remaining
+        percentage_of_completion = (bytes_downloaded / total_size) * 100
+
+        elapsed_time = time.time() - self.start_time
+        download_speed = bytes_downloaded / (1024 * 1024) / elapsed_time if elapsed_time > 0 else 0
+
+        self.progress["value"] = percentage_of_completion
+        self.speed_label.config(text=f"Speed: {download_speed:.2f} MB/s")
+        self.update_idletasks()
 
     def download_from_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
@@ -151,28 +206,46 @@ class YouTubeDownloader(tk.Tk):
         try:
             with open(file_path, 'r') as file:
                 urls = file.readlines()
-            for url in urls:
+            self.total_videos = len(urls)
+            self.current_video = 0
+
+            for idx, url in enumerate(urls):
                 url = url.strip()
                 if url:
                     try:
-                        video = YouTube(url)
+                        self.url_entry.delete(0, tk.END)
+                        self.url_entry.insert(0, url)
+                        self.fetch_video()
+                        
+                        self.video = YouTube(url, on_progress_callback=self.progress_callback)
                         format_choice = self.format_var.get()
                         if format_choice == "mp4":
-                            stream = video.streams.get_highest_resolution()
+                            stream = self.video.streams.get_highest_resolution()
                         elif format_choice == "mp3":
-                            stream = video.streams.filter(only_audio=True).first()
+                            stream = self.video.streams.filter(only_audio=True).first()
 
-                        output_path = stream.download(output_path=download_location)
+                        self.progress["value"] = 0
+                        self.start_time = time.time()
+                        self.update_idletasks()
+
+                        self.current_video = idx + 1
+                        self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}")
+
+                        stream.download(output_path=download_location)
+
                         if format_choice == "mp3":
                             base, ext = output_path.rsplit('.', 1)
                             new_file = f"{base}.mp3"
                             os.rename(output_path, new_file)
+
                     except VideoUnavailable:
                         self.status_label.config(text=f"Video unavailable: {url}", fg="red")
                     except Exception as e:
                         self.status_label.config(text=f"Failed to download video: {e}", fg="red")
 
             self.status_label.config(text="All downloads completed", fg="green")
+            self.speed_label.config(text="Speed: 0 MB/s")
+            self.num_videos_label.config(text="Videos: 0/0")
         except Exception as e:
             self.status_label.config(text=f"Error reading file: {e}", fg="red")
 

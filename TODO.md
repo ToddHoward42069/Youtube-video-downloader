@@ -1,2 +1,1 @@
-- refactoring if possible TwT
-- progress bar
+- try using cython
