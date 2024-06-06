@@ -208,14 +208,13 @@ class YouTubeDownloader(tk.Tk):
             self.current_video += 1
             self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}")
 
-            stream.download(output_path=download_location)
+            output_path = stream.download(output_path=download_location)
 
             self.progress["value"] = 100
             self.update_idletasks()
 
-
             if format_choice == "mp3":
-                base, ext = output_path.rsplit('.', 1)
+                base, ext = os.path.splitext(output_path)
                 new_file = f"{base}.mp3"
                 os.rename(output_path, new_file)
 
@@ -259,7 +258,7 @@ class YouTubeDownloader(tk.Tk):
                         self.url_entry.delete(0, tk.END)
                         self.url_entry.insert(0, url)
                         self.fetch_video()
-                        
+
                         self.video = YouTube(url, on_progress_callback=self.progress_callback)
                         format_choice = self.format_var.get()
                         if format_choice == "mp4":
@@ -274,10 +273,10 @@ class YouTubeDownloader(tk.Tk):
                         self.current_video = idx + 1
                         self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}")
 
-                        stream.download(output_path=download_location)
+                        output_path = stream.download(output_path=download_location)
 
                         if format_choice == "mp3":
-                            base, ext = output_path.rsplit('.', 1)
+                            base, ext = os.path.splitext(output_path)
                             new_file = f"{base}.mp3"
                             os.rename(output_path, new_file)
 
