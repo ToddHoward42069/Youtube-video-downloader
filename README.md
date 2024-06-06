@@ -9,17 +9,15 @@ A simple GUI-based YouTube video downloader for Windows built using Python and T
 - Download multiple videos from a text file containing YouTube URLs
 
 ## Built App
-The pre-built App is located in the output folder and can be executed directly. If you use Windows, you might have to make an exception to the exe file because Windows Defender might flag it as a false positve.
+The pre-built App is located in the output folder and can be executed directly.
 
 ## Requirements for development
 - Python 3.x
 - pytube package
 - tkinter (included with Python)
-- pillow package (PIL fork)
+- pillow package
 - requests package
 - certifi package
-- ssl module
-- os module
 
 ## Usage
 Install the required packages mentioned above. You can install them using pip:
