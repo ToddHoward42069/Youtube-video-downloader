@@ -45,5 +45,11 @@ Select the text file containing YouTube URLs.
 
 The application will download all videos sequentially.
 
+## How do I run the app in docker?
+
+```
+docker run -it --rm --name youtube-downloader -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix youtube-downloader
+```
+
 ## License
 This project is released under the MIT License.
