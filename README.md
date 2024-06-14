@@ -18,6 +18,10 @@ The pre-built App is located in the output folder and can be executed directly.
 - pillow package
 - requests package
 - certifi package
+- ffmpeg
+- ffmpeg-python
+- pydub
+- mutagen
 
 ## Usage
 Install the required packages mentioned above. You can install them using pip:
@@ -26,7 +30,7 @@ pip install pytube pillow requests certifi
 ```
 Run `youtube_downloader.py`:
 ```
-python youtube_downloader.py
+python3 youtube_downloader.py
 ```
 Enter the YouTube video URL in the text box.
 
@@ -45,8 +49,28 @@ Select the text file containing YouTube URLs.
 
 The application will download all videos sequentially.
 
-## How do I run the app in docker?
+## Running the App in Docker
 
+### Build the Docker Image
+Create a `Dockerfile` with the necessary instructions to build the image:
+```
+FROM python:3.9.5
+
+WORKDIR /app
+
+COPY . /app
+
+RUN pip install -r requirements.txt
+
+CMD ["python", "youtube_downloader.py"]
+```
+
+Build the Docker image:
+```
+docker build -t youtube-downloader .
+```
+
+Run the Docker container:
 ```
 docker run -it --rm --name youtube-downloader -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix youtube-downloader
 ```

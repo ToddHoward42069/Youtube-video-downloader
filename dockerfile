@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 80
 
 # Run the youtube_downloader.py when the container launches
-CMD ["python", "youtube_downloader.py"]
+CMD ["python", "main.py"]
