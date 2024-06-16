@@ -19,7 +19,8 @@ languages = {
         "all_downloads_complete": "All downloads completed",
         "error_reading_file": "Error reading file: ",
         "no_file_selected": "No file selected",
-        "enter_url": "Please enter a YouTube URL"
+        "enter_url": "Please enter a YouTube URL",
+        "tag_button": "Tag Video"
     },
     "Deutsch": {
         "title": "YouTube Video Downloader",
@@ -40,6 +41,7 @@ languages = {
         "all_downloads_complete": "Alle Downloads abgeschlossen",
         "error_reading_file": "Fehler beim Lesen der Datei: ",
         "no_file_selected": "Keine Datei ausgewählt",
-        "enter_url": "Bitte gebe eine YouTube URL ein"
+        "enter_url": "Bitte gebe eine YouTube URL ein",
+        "tag_button": "Video Taggen"
     }
 }

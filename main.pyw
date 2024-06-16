@@ -12,9 +12,8 @@ import ssl
 import certifi
 from languages import languages
 from pydantic import BaseModel, ValidationError, field_validator
-from mutagen.easyid3 import EasyID3
-import ffmpeg
 import sys
+import ffmpeg_script
 
 # Ensure that the certifi certificates are used
 os.environ['SSL_CERT_FILE'] = certifi.where()
@@ -41,7 +40,7 @@ class YouTubeDownloader(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("YouTube Video Downloader")
-        self.geometry("600x700")
+        self.geometry("600x750")
         self.configure(bg="#2b2b2b")
 
         self.languages = languages
@@ -102,6 +101,10 @@ class YouTubeDownloader(tk.Tk):
         self.file_download_button = tk.Button(self, text=self.languages[self.current_language]["file_download_button"], font=("Helvetica", 12), bg="#f44336", fg="white", command=self.start_file_download_thread)
         self.file_download_button.pack(pady=10)
 
+        # Tag Button
+        self.tag_button = tk.Button(self, text=self.languages[self.current_language]["tag_button"], font=("Helvetica", 12), bg="#f44336", fg="white", command=self.start_tagging_thread)
+        self.tag_button.pack(pady=10)
+
         # Progress Bar
         self.progress = ttk.Progressbar(self, orient="horizontal", length=400, mode="determinate")
         self.progress.pack(pady=20)
@@ -122,6 +125,7 @@ class YouTubeDownloader(tk.Tk):
         self.start_time = None
         self.total_videos = 0
         self.current_video = 0
+        self.last_downloaded_path = None  # Store the path of the last downloaded file
 
     def change_language(self, lang):
         self.current_language = lang
@@ -134,13 +138,16 @@ class YouTubeDownloader(tk.Tk):
 
     def load_saved_language(self):
         try:
-            with open(resource_path("language_preference.txt"), "r") as file:
+            with open("language_preference.txt", "r") as file:
                 return file.read().strip()
         except FileNotFoundError:
-            return None
+            # Handle file not found - either create default or return default
+            # Here, we'll create a default file with "English" language
+            self.save_language_preference("English")
+            return "English"
 
     def save_language_preference(self, lang):
-        with open(resource_path("language_preference.txt"), "w") as file:
+        with open("language_preference.txt", "w") as file:
             file.write(lang)
     
 
@@ -152,6 +159,7 @@ class YouTubeDownloader(tk.Tk):
         self.location_button.config(text=self.languages[self.current_language]["location_button"])
         self.download_button.config(text=self.languages[self.current_language]["download_button"])
         self.file_download_button.config(text=self.languages[self.current_language]["file_download_button"])
+        self.tag_button.config(text=self.languages[self.current_language]["tag_button"])
         self.speed_label.config(text=self.languages[self.current_language]["speed_label"])
         self.num_videos_label.config(text=self.languages[self.current_language]["num_videos_label"])
         self.status_label.config(text=self.languages[self.current_language]["status_label"])
@@ -220,25 +228,20 @@ class YouTubeDownloader(tk.Tk):
         download_location = self.get_download_location()
 
         try:
+            self.start_time = time.time()
             format_choice = self.format_var.get()
             if format_choice == "mp4":
                 stream = self.video.streams.get_highest_resolution()
                 output_path = stream.download(output_path=download_location)
+                self.last_downloaded_path = output_path
                 self.status_label.config(text=f"Downloaded video to: {output_path}", fg="green")
             elif format_choice == "mp3":
                 audio_stream = self.video.streams.filter(only_audio=True).first()
                 output_filename = f"{self.video.title}.mp3"
                 output_path = os.path.join(download_location, output_filename)
-
-                # Download and convert using ffmpeg-python
-                (
-                    ffmpeg
-                    .input(audio_stream.url)
-                    .output(output_path, format='mp3', acodec='libmp3lame', ab='320k', ar='44100')
-                    .run()
-                )
-
-                self.tag_audio(output_path)
+                self.last_downloaded_path = output_path
+                audio_stream.download(filename=output_filename, output_path=download_location)
+                # Removed: self.tag_audio(output_path)  
 
             self.progress["value"] = 100
             self.update_idletasks()
@@ -251,16 +254,21 @@ class YouTubeDownloader(tk.Tk):
 
 
     def tag_audio(self, output_path):
-        try:
-            audio_file = EasyID3(output_path)
-            audio_file["title"] = self.video.title
-            audio_file["artist"] = self.video.author
-            audio_file["album"] = self.video.title
-            audio_file["genre"] = "Podcast"
-            audio_file.save()
-            self.status_label.config(text=f"Downloaded and tagged audio to: {output_path}", fg="green")
-        except Exception as e:
-            self.status_label.config(text=f"Audio downloaded but tagging failed: {e}", fg="red")
+        if output_path.endswith(".mp3"):
+            try:
+                # Call your ffmpeg_script.py here
+                ffmpeg_script.add_bitrate_samplerate(input_file=self.last_downloaded_path)
+                self.status_label.config(
+                    text=f"Audio tagged: {self.last_downloaded_path}", fg="green"
+                )
+            except Exception as e:
+                self.status_label.config(
+                    text=f"Audio tagging failed: {e}", fg="red"
+                )
+        else:
+            self.status_label.config(
+                text=f"Tagging is only supported for MP3 files", fg="red"
+            )
 
     def progress_callback(self, stream, chunk, bytes_remaining):
         total_size = stream.filesize
@@ -306,15 +314,7 @@ class YouTubeDownloader(tk.Tk):
                             audio_stream = self.video.streams.filter(only_audio=True).first()
                             output_filename = f"{self.video.title}.mp3"
                             output_path = os.path.join(download_location, output_filename)
-
-                            # Download and convert using ffmpeg-python
-                            (
-                                ffmpeg
-                                .input(audio_stream.url)
-                                .output(output_path, format='mp3', acodec='libmp3lame', ab='320k', ar='44100')
-                                .run()
-                            )
-
+                            audio_stream.download(filename=output_filename, output_path=download_location)
                             self.tag_audio(output_path)
 
                         self.progress["value"] = 100
@@ -331,6 +331,13 @@ class YouTubeDownloader(tk.Tk):
             self.num_videos_label.config(text="Videos: 0/0")
         except Exception as e:
             self.status_label.config(text=f"Error reading file: {e}", fg="red")
+
+    def start_tagging_thread(self):
+        if self.last_downloaded_path:
+            thread = threading.Thread(target=self.tag_audio, args=(self.last_downloaded_path,))
+            thread.start()
+        else:
+            self.status_label.config(text=self.languages[self.current_language]["no_file_found"], fg="red")
 
 if __name__ == "__main__":
     app = YouTubeDownloader()
