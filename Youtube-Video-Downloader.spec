@@ -5,7 +5,7 @@ a = Analysis(
     ['main.pyw'],
     pathex=[],
     binaries=[],
-    datas=[('language_preference.txt', '.')],
+    datas=[],
     hiddenimports=['PIL._imaging', 'pydub', 'PIL', 'pytube', 'requests', 'certifi', 'mutagen', 'pydantic', 'ffmpeg', 'ffmpeg_python', 'PIL._tkinter_finder'],
     hookspath=[],
     hooksconfig={},
