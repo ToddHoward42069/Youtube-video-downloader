@@ -1,0 +1,3 @@
+- Improve mp4 to correctly download videos till the end
+- fix the download speed and amount of videos not updating correctly
+- fix thumbnails not updating correctly when downloading from a file
