@@ -20,7 +20,9 @@ languages = {
         "error_reading_file": "Error reading file: ",
         "no_file_selected": "No file selected",
         "enter_url": "Please enter a YouTube URL",
-        "tag_button": "Tag Video"
+        "tag_button": "Tag Video",
+        "tag_list_button": "Tag List",
+        "no_file_found": "No downloaded files found"
     },
     "Deutsch": {
         "title": "YouTube Video Downloader",
@@ -42,6 +44,8 @@ languages = {
         "error_reading_file": "Fehler beim Lesen der Datei: ",
         "no_file_selected": "Keine Datei ausgewählt",
         "enter_url": "Bitte gebe eine YouTube URL ein",
-        "tag_button": "Video Taggen"
+        "tag_button": "Video Taggen",
+        "tag_list_button": "Liste Taggen",
+        "no_file_found": "Keine heruntergeladenen Dateien gefunden"
     }
 }

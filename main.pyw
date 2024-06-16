@@ -40,7 +40,7 @@ class YouTubeDownloader(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("YouTube Video Downloader")
-        self.geometry("600x750")
+        self.geometry("650x800")
         self.configure(bg="#2b2b2b")
 
         self.languages = languages
@@ -105,6 +105,10 @@ class YouTubeDownloader(tk.Tk):
         self.tag_button = tk.Button(self, text=self.languages[self.current_language]["tag_button"], font=("Helvetica", 12), bg="#f44336", fg="white", command=self.start_tagging_thread)
         self.tag_button.pack(pady=10)
 
+        # Tag List Button
+        self.tag_list_button = tk.Button(self, text=self.languages[self.current_language].get("tag_list_button", "Tag List"), font=("Helvetica", 12), bg="#f44336", fg="white", command=self.tag_files_in_directory)
+        self.tag_list_button.pack(pady=10)
+
         # Progress Bar
         self.progress = ttk.Progressbar(self, orient="horizontal", length=400, mode="determinate")
         self.progress.pack(pady=20)
@@ -126,6 +130,7 @@ class YouTubeDownloader(tk.Tk):
         self.total_videos = 0
         self.current_video = 0
         self.last_downloaded_path = None  # Store the path of the last downloaded file
+        self.downloaded_files = [] # List to store paths of downloaded files
 
     def change_language(self, lang):
         self.current_language = lang
@@ -160,6 +165,7 @@ class YouTubeDownloader(tk.Tk):
         self.download_button.config(text=self.languages[self.current_language]["download_button"])
         self.file_download_button.config(text=self.languages[self.current_language]["file_download_button"])
         self.tag_button.config(text=self.languages[self.current_language]["tag_button"])
+        self.tag_list_button.config(text=self.languages[self.current_language].get("tag_list_button", "Tag List"))
         self.speed_label.config(text=self.languages[self.current_language]["speed_label"])
         self.num_videos_label.config(text=self.languages[self.current_language]["num_videos_label"])
         self.status_label.config(text=self.languages[self.current_language]["status_label"])
@@ -183,13 +189,7 @@ class YouTubeDownloader(tk.Tk):
         try:
             video_info = VideoInfo(url=url)
             self.video = YouTube(url, on_progress_callback=self.progress_callback)
-            response = requests.get(self.video.thumbnail_url)
-            image_data = response.content
-            image = Image.open(io.BytesIO(image_data))
-            image = image.resize((320, 180), Image.Resampling.LANCZOS)
-            thumbnail = ImageTk.PhotoImage(image)
-            self.thumbnail_label.config(image=thumbnail)
-            self.thumbnail_label.image = thumbnail
+            self.show_thumbnail(self.video.thumbnail_url)
             self.status_label.config(text=self.languages[self.current_language]["fetch_success"], fg="green")
         except ValidationError as e:
             self.thumbnail_label.config(image='')
@@ -201,6 +201,15 @@ class YouTubeDownloader(tk.Tk):
             self.thumbnail_label.config(image='')
             self.status_label.config(text=f"{self.languages[self.current_language]['fetch_fail']}{e}", fg="red")
 
+    def show_thumbnail(self, thumbnail_url):
+        response = requests.get(thumbnail_url)
+        image_data = response.content
+        image = Image.open(io.BytesIO(image_data))
+        image = image.resize((320, 180), Image.Resampling.LANCZOS)
+        thumbnail = ImageTk.PhotoImage(image)
+        self.thumbnail_label.config(image=thumbnail)
+        self.thumbnail_label.image = thumbnail
+
     def select_location(self):
         self.download_location = filedialog.askdirectory()
         if self.download_location:
@@ -211,14 +220,68 @@ class YouTubeDownloader(tk.Tk):
 
     def start_download_thread(self):
         self.total_videos = 1
-        self.current_video = 0
-        self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}")
+        self.current_video = 0 # Reset counter for single download
+        self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}") # Update counter display
         thread = threading.Thread(target=self.download_video)
         thread.start()
 
     def start_file_download_thread(self):
-        thread = threading.Thread(target=self.download_from_file)
-        thread.start()
+        file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        if not file_path:
+            self.status_label.config(text="No file selected", fg="red")
+            return
+
+        download_location = self.get_download_location()
+
+        try:
+            with open(file_path, 'r') as file:
+                urls = file.readlines()
+            self.total_videos = len(urls)
+            self.current_video = 0 # Reset counter for file downloads
+            self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}") # Update counter display
+            self.downloaded_files = [] # Reset downloaded files list
+
+            for idx, url in enumerate(urls):
+                url = url.strip()
+                if url:
+                    try:
+                        self.url_entry.delete(0, tk.END)
+                        self.url_entry.insert(0, url)
+                        self.fetch_video()
+
+                        self.video = YouTube(url, on_progress_callback=self.progress_callback)
+                        format_choice = self.format_var.get()
+                        if format_choice == "mp4":
+                            stream = self.video.streams.get_highest_resolution()
+                            output_path = stream.download(output_path=download_location)
+                            self.last_downloaded_path = output_path
+                            self.status_label.config(text=f"Downloaded video to: {output_path}", fg="green")
+                        elif format_choice == "mp3":
+                            audio_stream = self.video.streams.filter(only_audio=True).first()
+                            output_filename = f"{self.video.title}.mp3"
+                            output_path = os.path.join(download_location, output_filename)
+                            self.last_downloaded_path = output_path
+                            audio_stream.download(filename=output_filename, output_path=download_location)
+                            if self.tag_after_download_var.get():
+                                self.tag_audio(output_path)
+                            self.downloaded_files.append(output_path)
+
+                        self.progress["value"] = 100
+                        self.update_idletasks()
+                        self.speed_label.config(text="Speed: 0 MB/s")
+                        self.current_video = idx + 1
+                        self.num_videos_label.config(text=f"Videos: {self.current_video}/{self.total_videos}")
+                        
+                    except VideoUnavailable:
+                        self.status_label.config(text=f"Video unavailable: {url}", fg="red")
+                    except Exception as e:
+                        self.status_label.config(text=f"Failed to download: {e}", fg="red")
+
+            self.status_label.config(text="All downloads completed", fg="green")
+            self.speed_label.config(text="Speed: 0 MB/s")
+            self.num_videos_label.config(text="Videos: 0/0")
+        except Exception as e:
+            self.status_label.config(text=f"Error reading file: {e}", fg="red")
 
     def download_video(self):
         if not self.video:
@@ -241,11 +304,13 @@ class YouTubeDownloader(tk.Tk):
                 output_path = os.path.join(download_location, output_filename)
                 self.last_downloaded_path = output_path
                 audio_stream.download(filename=output_filename, output_path=download_location)
-                # Removed: self.tag_audio(output_path)  
+                if self.tag_after_download_var.get():
+                    self.tag_audio(output_path)
+                    self.downloaded_files.append(output_path) 
 
             self.progress["value"] = 100
             self.update_idletasks()
-            self.speed_label.config(text="Speed: 0 MB/s")
+            self.speed_label.config(text="Speed: 0 MB/s") 
 
         except VideoUnavailable:
             self.status_label.config(text="This video is unavailable", fg="red")
@@ -256,10 +321,9 @@ class YouTubeDownloader(tk.Tk):
     def tag_audio(self, output_path):
         if output_path.endswith(".mp3"):
             try:
-                # Call your ffmpeg_script.py here
-                ffmpeg_script.add_bitrate_samplerate(input_file=self.last_downloaded_path)
+                ffmpeg_script.add_bitrate_samplerate(input_file=output_path)
                 self.status_label.config(
-                    text=f"Audio tagged: {self.last_downloaded_path}", fg="green"
+                    text=f"Audio tagged: {output_path}", fg="green"
                 )
             except Exception as e:
                 self.status_label.config(
@@ -282,62 +346,32 @@ class YouTubeDownloader(tk.Tk):
         self.speed_label.config(text=f"Speed: {download_speed:.2f} MB/s")
         self.update_idletasks()
 
-    def download_from_file(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
-        if not file_path:
-            self.status_label.config(text="No file selected", fg="red")
-            return
-
-        download_location = self.get_download_location()
-
-        try:
-            with open(file_path, 'r') as file:
-                urls = file.readlines()
-            self.total_videos = len(urls)
-            self.current_video = 0
-
-            for idx, url in enumerate(urls):
-                url = url.strip()
-                if url:
-                    try:
-                        self.url_entry.delete(0, tk.END)
-                        self.url_entry.insert(0, url)
-                        self.fetch_video()
-
-                        self.video = YouTube(url, on_progress_callback=self.progress_callback)
-                        format_choice = self.format_var.get()
-                        if format_choice == "mp4":
-                            stream = self.video.streams.get_highest_resolution()
-                            output_path = stream.download(output_path=download_location)
-                            self.status_label.config(text=f"Downloaded video to: {output_path}", fg="green")
-                        elif format_choice == "mp3":
-                            audio_stream = self.video.streams.filter(only_audio=True).first()
-                            output_filename = f"{self.video.title}.mp3"
-                            output_path = os.path.join(download_location, output_filename)
-                            audio_stream.download(filename=output_filename, output_path=download_location)
-                            self.tag_audio(output_path)
-
-                        self.progress["value"] = 100
-                        self.update_idletasks()
-                        self.speed_label.config(text="Speed: 0 MB/s")
-                        
-                    except VideoUnavailable:
-                        self.status_label.config(text=f"Video unavailable: {url}", fg="red")
-                    except Exception as e:
-                        self.status_label.config(text=f"Failed to download: {e}", fg="red")
-
-            self.status_label.config(text="All downloads completed", fg="green")
-            self.speed_label.config(text="Speed: 0 MB/s")
-            self.num_videos_label.config(text="Videos: 0/0")
-        except Exception as e:
-            self.status_label.config(text=f"Error reading file: {e}", fg="red")
-
     def start_tagging_thread(self):
-        if self.last_downloaded_path:
-            thread = threading.Thread(target=self.tag_audio, args=(self.last_downloaded_path,))
-            thread.start()
+        if self.downloaded_files:
+            for file_path in self.downloaded_files:
+                if file_path.endswith(".mp3"): 
+                    thread = threading.Thread(target=self.tag_audio, args=(file_path,))
+                    thread.start()
+                else:
+                    self.status_label.config(text=f"Tagging is only supported for MP3 files", fg="red")
         else:
             self.status_label.config(text=self.languages[self.current_language]["no_file_found"], fg="red")
+            
+    def tag_files_in_directory(self):
+        directory = filedialog.askdirectory()
+        if not directory:
+            self.status_label.config(text="No directory selected", fg="red")
+            return
+
+        for filename in os.listdir(directory):
+            if filename.endswith(".mp3"):
+                file_path = os.path.join(directory, filename)
+                try:
+                    ffmpeg_script.add_bitrate_samplerate(input_file=file_path)
+                    self.status_label.config(text=f"Audio tagged: {file_path}", fg="green")
+                except Exception as e:
+                    self.status_label.config(text=f"Audio tagging failed: {e}", fg="red")
+        self.status_label.config(text="Tagging complete.", fg="green") 
 
 if __name__ == "__main__":
     app = YouTubeDownloader()

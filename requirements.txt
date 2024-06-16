@@ -3,8 +3,6 @@ pytube
 pillow
 requests
 certifi
-pydub
-mutagen
 pydantic
 ffmpeg-python
 ffmpeg
