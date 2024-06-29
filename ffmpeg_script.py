@@ -5,21 +5,25 @@ import os
 import tempfile
 import shutil
 
+
 def add_bitrate_samplerate(input_file, bitrate="320k", samplerate="44100"):
     """Adds bitrate and samplerate to the input file, overwriting the original."""
     try:
         # Create a temporary file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-        temp_file.close() 
+        temp_file.close()
 
         # Construct the FFmpeg command
         command = [
             "ffmpeg",
-            "-i", input_file,
-            "-b:a", bitrate,
-            "-ar", samplerate,
-            "-y", 
-            temp_file.name
+            "-i",
+            input_file,
+            "-b:a",
+            bitrate,
+            "-ar",
+            samplerate,
+            "-y",
+            temp_file.name,
         ]
 
         # Run FFmpeg command

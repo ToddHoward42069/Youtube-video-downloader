@@ -22,7 +22,7 @@ languages = {
         "enter_url": "Please enter a YouTube URL",
         "tag_list_button": "Tag List",
         "no_file_found": "No downloaded files found",
-        "tag_checkbox_text": "Tag after download"
+        "tag_checkbox_text": "Tag after download",
     },
     "Deutsch": {
         "title": "YouTube Video Downloader",
@@ -46,6 +46,6 @@ languages = {
         "enter_url": "Bitte gebe eine YouTube URL ein",
         "tag_list_button": "Liste Taggen",
         "no_file_found": "Keine heruntergeladenen Dateien gefunden",
-        "tag_checkbox_text": "Nach download taggen"
-    }
+        "tag_checkbox_text": "Nach download taggen",
+    },
 }
