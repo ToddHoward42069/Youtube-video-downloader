@@ -33,6 +33,17 @@ class YouTubeDownloader(tk.Tk):
         self.geometry("650x800")
         self.configure(bg="#2b2b2b")
 
+         # Version Number
+        self.version = "1.2.0"  # Example version number
+        self.version_label = tk.Label(
+            self,
+            text=f"v.{self.version}",
+            font=("Helvetica", 10),
+            bg="#2b2b2b",
+            fg="white",
+        )
+        self.version_label.place(x=10, y=10)
+
         self.languages = languages
         self.current_language = self.load_saved_language() or "English"
 
