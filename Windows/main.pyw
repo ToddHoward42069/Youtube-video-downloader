@@ -12,7 +12,9 @@ import ssl
 import certifi
 from languages import languages
 import sys
-import ffmpeg_script
+import subprocess
+import shutil
+import tempfile
 
 # Ensure that the certifi certificates are used
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -26,16 +28,53 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+def add_bitrate_samplerate(input_file, bitrate="320k", samplerate="44100"):
+    """Adds bitrate and samplerate to the input file, overwriting the original."""
+    try:
+        # Create a temporary file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        temp_file.close()
+
+        # Construct the FFmpeg command
+        command = [
+            "ffmpeg",
+            "-i",
+            input_file,
+            "-b:a",
+            bitrate,
+            "-ar",
+            samplerate,
+            "-y",
+            temp_file.name,
+        ]
+
+        # Run FFmpeg command, suppressing the window
+        subprocess.run(command, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+
+        # Copy the temporary file to the original file's location
+        shutil.copyfile(temp_file.name, input_file)
+
+        # Delete the temporary file
+        os.remove(temp_file.name)
+
+        print(f"FFmpeg script executed successfully. File modified: {input_file}")
+
+    except subprocess.CalledProcessError as e:
+        print(f"FFmpeg script failed: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
 class YouTubeDownloader(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("YouTube Video Downloader")
         self.configure(bg="#2b2b2b")
         # Window Size
-        self.minsize(800, 600)
+        self.minsize(800, 650)
 
         # Version Number
-        self.version = "1.3.0"
+        self.version = "1.3.5"
 
         # Load Languages
         self.languages = languages
@@ -54,6 +93,7 @@ class YouTubeDownloader(tk.Tk):
         self.last_downloaded_path = None
         self.downloaded_files = []
         self.download_thread = None
+        self.tagging_progress = tk.IntVar(value=0)
 
     def create_widgets(self):
         # --- Top Frame (Title, Version, Language) ---
@@ -225,10 +265,37 @@ class YouTubeDownloader(tk.Tk):
         progress_frame = tk.Frame(self, bg="#2b2b2b")
         progress_frame.pack(pady=20)
 
+        # Download progress bar
+        self.download_progress_label = tk.Label(
+            progress_frame,
+            text="Download progress:",
+            font=("Helvetica", 12),
+            bg="#2b2b2b",
+            fg="white",
+        )
+        self.download_progress_label.pack()
         self.progress = ttk.Progressbar(
             progress_frame, orient="horizontal", length=600, mode="determinate"
         )
         self.progress.pack(pady=10)
+
+        # Tagging progress bar
+        self.tagging_progress_label = tk.Label(
+            progress_frame,
+            text="Tagging progress:",
+            font=("Helvetica", 12),
+            bg="#2b2b2b",
+            fg="white",
+        )
+        self.tagging_progress_label.pack()
+        self.tagging_progressbar = ttk.Progressbar(
+            progress_frame,
+            orient="horizontal",
+            length=600,
+            mode="determinate",
+            # No variable assignment here!
+        )
+        self.tagging_progressbar.pack(pady=10)
 
         self.status_label = tk.Label(
             progress_frame,
@@ -307,6 +374,12 @@ class YouTubeDownloader(tk.Tk):
         )
         self.tag_after_download_checkbox.config(
             text=self.languages[self.current_language]["tag_checkbox_text"]
+        )
+        self.download_progress_label.config(
+            text=self.languages[self.current_language]["download_progressbar_label"]
+        )
+        self.tagging_progress_label.config(
+            text=self.languages[self.current_language]["tagging_progressbar_label"]
         )
 
     def select_all(self, event):
@@ -508,7 +581,7 @@ class YouTubeDownloader(tk.Tk):
     def tag_audio(self, output_path):
         if output_path.endswith(".mp3"):
             try:
-                ffmpeg_script.add_bitrate_samplerate(input_file=output_path)
+                add_bitrate_samplerate(input_file=output_path)
                 self.status_label.config(
                     text=f"Audio tagged: {output_path}", fg="green"
                 )
@@ -559,18 +632,28 @@ class YouTubeDownloader(tk.Tk):
             )
             return
 
-        for filename in os.listdir(directory):
-            if filename.endswith(".mp3"):
-                file_path = os.path.join(directory, filename)
-                try:
-                    ffmpeg_script.add_bitrate_samplerate(input_file=file_path)
-                    self.status_label.config(
-                        text=f"Audio tagged: {file_path}", fg="green"
-                    )
-                except Exception as e:
-                    self.status_label.config(
-                        text=f"Audio tagging failed: {e}", fg="red"
-                    )
+        files_to_tag = [
+            f for f in os.listdir(directory) if f.endswith(".mp3")
+        ]
+        total_files = len(files_to_tag)
+
+        for i, filename in enumerate(files_to_tag):
+            file_path = os.path.join(directory, filename)
+            try:
+                add_bitrate_samplerate(input_file=file_path)
+                self.status_label.config(
+                    text=f"Audio tagged: {file_path}", fg="green"
+                )
+            except Exception as e:
+                self.status_label.config(
+                    text=f"Audio tagging failed: {e}", fg="red"
+                )
+
+            # Update tagging progress bar DIRECTLY
+            progress_percentage = (i + 1) / total_files * 100
+            self.tagging_progressbar['value'] = progress_percentage
+            self.update_idletasks()  # Update the GUI
+
         self.status_label.config(text="Tagging complete.", fg="green")
 
 

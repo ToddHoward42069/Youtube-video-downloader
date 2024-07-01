@@ -23,6 +23,8 @@ languages = {
         "tag_list_button": "Tag List",
         "no_file_found": "No downloaded files found",
         "tag_checkbox_text": "Tag after download",
+        "download_progressbar_label": "Download Progress:",
+        "tagging_progressbar_label": "Tagging Progress:",
     },
     "Deutsch": {
         "title": "YouTube Video Downloader",
@@ -46,6 +48,8 @@ languages = {
         "enter_url": "Bitte gebe eine YouTube URL ein",
         "tag_list_button": "Liste Taggen",
         "no_file_found": "Keine heruntergeladenen Dateien gefunden",
-        "tag_checkbox_text": "Nach download taggen",
+        "tag_checkbox_text": "Nach Download taggen",
+        "download_progressbar_label": "Download Fortschritt:",
+        "tagging_progressbar_label": "Tagging Fortschritt:",
     },
 }

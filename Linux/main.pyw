@@ -27,10 +27,10 @@ class YouTubeDownloader(tk.Tk):
         self.title("YouTube Video Downloader")
         self.configure(bg="#2b2b2b")
         # Window Size
-        self.minsize(800, 600)
+        self.minsize(800, 620)
 
         # Version Number
-        self.version = "1.3.0"
+        self.version = "1.3.5"
 
         # Load Languages
         self.languages = languages
@@ -49,6 +49,7 @@ class YouTubeDownloader(tk.Tk):
         self.last_downloaded_path = None
         self.downloaded_files = []
         self.download_thread = None
+        self.tagging_progress = tk.IntVar(value=0)  # For tagging progress bar
 
     def create_widgets(self):
         # --- Top Frame (Title, Version, Language) ---
@@ -107,9 +108,7 @@ class YouTubeDownloader(tk.Tk):
         thumbnail_options_frame.pack(pady=20)
 
         # Thumbnail
-        self.thumbnail_label = tk.Label(
-            thumbnail_options_frame, bg="#2b2b2b"
-        )
+        self.thumbnail_label = tk.Label(thumbnail_options_frame, bg="#2b2b2b")
         self.thumbnail_label.pack(side=tk.LEFT, padx=20)
 
         # --- Download Options Frame ---
@@ -220,10 +219,35 @@ class YouTubeDownloader(tk.Tk):
         progress_frame = tk.Frame(self, bg="#2b2b2b")
         progress_frame.pack(pady=20)
 
+        # Download Progress Bar
+        self.download_progress_label = tk.Label(
+            progress_frame,
+            text=self.languages[self.current_language]["download_progressbar_label"],
+            font=("Helvetica", 12),
+            bg="#2b2b2b",
+            fg="white",
+        )
+        self.download_progress_label.pack()
+
         self.progress = ttk.Progressbar(
             progress_frame, orient="horizontal", length=600, mode="determinate"
         )
         self.progress.pack(pady=10)
+
+        # Tagging Progress Bar
+        self.tagging_progress_label = tk.Label(
+            progress_frame,
+            text=self.languages[self.current_language]["tagging_progressbar_label"],
+            font=("Helvetica", 12),
+            bg="#2b2b2b",
+            fg="white",
+        )
+        self.tagging_progress_label.pack()
+
+        self.tagging_progressbar = ttk.Progressbar(
+            progress_frame, orient="horizontal", length=600, mode="determinate"
+        )
+        self.tagging_progressbar.pack(pady=10)
 
         self.status_label = tk.Label(
             progress_frame,
@@ -302,6 +326,13 @@ class YouTubeDownloader(tk.Tk):
         )
         self.tag_after_download_checkbox.config(
             text=self.languages[self.current_language]["tag_checkbox_text"]
+        )
+        # Update progress bar labels
+        self.download_progress_label.config(
+            text=self.languages[self.current_language]["download_progressbar_label"]
+        )
+        self.tagging_progress_label.config(
+            text=self.languages[self.current_language]["tagging_progressbar_label"]
         )
 
     def select_all(self, event):
@@ -554,18 +585,26 @@ class YouTubeDownloader(tk.Tk):
             )
             return
 
-        for filename in os.listdir(directory):
-            if filename.endswith(".mp3"):
-                file_path = os.path.join(directory, filename)
-                try:
-                    add_bitrate_samplerate(input_file=file_path)
-                    self.status_label.config(
-                        text=f"Audio tagged: {file_path}", fg="green"
-                    )
-                except Exception as e:
-                    self.status_label.config(
-                        text=f"Audio tagging failed: {e}", fg="red"
-                    )
+        files_to_tag = [f for f in os.listdir(directory) if f.endswith(".mp3")]
+        total_files = len(files_to_tag)
+
+        for i, filename in enumerate(files_to_tag):
+            file_path = os.path.join(directory, filename)
+            try:
+                add_bitrate_samplerate(input_file=file_path)
+                self.status_label.config(
+                    text=f"Audio tagged: {file_path}", fg="green"
+                )
+            except Exception as e:
+                self.status_label.config(
+                    text=f"Audio tagging failed: {e}", fg="red"
+                )
+
+            # Update the tagging progress bar
+            progress_percentage = (i + 1) / total_files * 100
+            self.tagging_progressbar["value"] = progress_percentage
+            self.update_idletasks()
+
         self.status_label.config(text="Tagging complete.", fg="green")
 
 
