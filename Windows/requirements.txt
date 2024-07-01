@@ -1,0 +1,9 @@
+tk
+pytube
+pillow
+requests
+certifi
+pydantic
+ffmpeg-python
+ffmpeg
+-r requirements-dev.txt
