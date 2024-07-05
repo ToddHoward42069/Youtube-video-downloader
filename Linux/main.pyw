@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 from pytube import YouTube
-from pytube.exceptions import VideoUnavailable
+from pytube.exceptions import VideoUnavailable, RegexMatchError
 from PIL import Image, ImageTk
 import io
 import requests
@@ -16,6 +16,7 @@ import sys
 import subprocess
 import tempfile
 import shutil
+from mutagen.easyid3 import EasyID3
 
 # Ensure that the certifi certificates are used
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -30,7 +31,7 @@ class YouTubeDownloader(tk.Tk):
         self.minsize(800, 620)
 
         # Version Number
-        self.version = "1.3.5"
+        self.version = "1.4.0"
 
         # Load Languages
         self.languages = languages
@@ -40,7 +41,7 @@ class YouTubeDownloader(tk.Tk):
         self.create_widgets()
 
         # Initial Settings
-        self.download_location = ""
+        self.download_location = self.get_download_location()  # Initialize download location
         self.video = None
         self.fetch_job = None
         self.start_time = None
@@ -255,6 +256,7 @@ class YouTubeDownloader(tk.Tk):
             font=("Helvetica", 12),
             bg="#2b2b2b",
             fg="red",
+            wraplength=600  # Wrap long error messages
         )
         self.status_label.pack()
 
@@ -362,6 +364,12 @@ class YouTubeDownloader(tk.Tk):
                 text=self.languages[self.current_language]["fetch_success"],
                 fg="green",
             )
+        except RegexMatchError: # Catch invalid YouTube URL
+            self.thumbnail_label.config(image="")
+            self.status_label.config(
+                text=self.languages[self.current_language]["invalid_url"],
+                fg="red",
+            )
         except VideoUnavailable:
             self.thumbnail_label.config(image="")
             self.status_label.config(
@@ -395,11 +403,7 @@ class YouTubeDownloader(tk.Tk):
             )
 
     def get_download_location(self):
-        return (
-            self.download_location
-            if self.download_location
-            else os.path.expanduser("~/Downloads")
-        )
+        return os.path.expanduser("~/Downloads")  # Default download location
 
     def start_download_thread(self):
         if self.download_thread and self.download_thread.is_alive():
@@ -430,9 +434,9 @@ class YouTubeDownloader(tk.Tk):
         self.download_thread.start()
 
     def download_videos_from_file(self, file_path):
-        download_location = self.get_download_location()
+        download_location = self.download_location  # Use the chosen location
         try:
-            with open(file_path, "r") as file:
+            with open(file_path, "r", encoding='utf-8') as file:  # Ensure proper encoding when reading the file
                 urls = file.readlines()
             self.total_videos = len(urls)
             self.current_video = 0
@@ -485,7 +489,7 @@ class YouTubeDownloader(tk.Tk):
             )
             return
 
-        download_location = self.get_download_location()
+        download_location = self.download_location  # Use the chosen location
 
         # Create and start the download thread
         self.download_thread = threading.Thread(
@@ -531,10 +535,12 @@ class YouTubeDownloader(tk.Tk):
                 text=f"Failed to download: {e}", fg="red"
             )
 
+
     def tag_audio(self, output_path):
         if output_path.endswith(".mp3"):
             try:
-                add_bitrate_samplerate(input_file=output_path)
+                self.add_id3_tags(output_path) # Add ID3 tags first
+                add_bitrate_samplerate(input_file=output_path) # Then handle bitrate and sample rate
                 self.status_label.config(
                     text=f"Audio tagged: {output_path}", fg="green"
                 )
@@ -546,6 +552,22 @@ class YouTubeDownloader(tk.Tk):
             self.status_label.config(
                 text=f"Tagging is only supported for MP3 files", fg="red"
             )
+
+    def add_id3_tags(self, file_path):
+        try:
+            # Extract artist and title from filename
+            filename = os.path.basename(file_path)
+            parts = filename.split(" - ")
+            if len(parts) == 2:
+                artist = parts[0].split(" ", 1)[1].strip()  # Remove song number
+                title = parts[1].replace(".mp3", "").strip()
+
+                audio = EasyID3(file_path)
+                audio["title"] = title
+                audio["artist"] = artist
+                audio.save()
+        except Exception as e:
+            print(f"Error adding ID3 tags: {e}")
 
     def progress_callback(self, stream, chunk, bytes_remaining):
         total_size = stream.filesize
@@ -580,7 +602,7 @@ class YouTubeDownloader(tk.Tk):
         directory = filedialog.askdirectory()
         if not directory:
             self.status_label.config(
-                text=self.languages[self.current_language]["no_file_selected"],
+                text=self.languages[self.current_language]["no_directory_selected"],
                 fg="red",
             )
             return
@@ -588,9 +610,18 @@ class YouTubeDownloader(tk.Tk):
         files_to_tag = [f for f in os.listdir(directory) if f.endswith(".mp3")]
         total_files = len(files_to_tag)
 
+        if total_files == 0:
+            self.status_label.config(
+                text=self.languages[self.current_language]["no_mp3_files_found"],
+                fg="red",
+            )
+            return
+
+        self.current_video = 0 # Reset the current video counter for tagging
         for i, filename in enumerate(files_to_tag):
             file_path = os.path.join(directory, filename)
             try:
+                self.add_id3_tags(file_path)
                 add_bitrate_samplerate(input_file=file_path)
                 self.status_label.config(
                     text=f"Audio tagged: {file_path}", fg="green"
@@ -601,6 +632,10 @@ class YouTubeDownloader(tk.Tk):
                 )
 
             # Update the tagging progress bar
+            self.current_video = i + 1
+            self.num_videos_label.config(
+                text=f"Videos: {self.current_video}/{total_files}"
+            )
             progress_percentage = (i + 1) / total_files * 100
             self.tagging_progressbar["value"] = progress_percentage
             self.update_idletasks()
@@ -618,13 +653,17 @@ def add_bitrate_samplerate(input_file, bitrate="320k", samplerate="44100"):
         # Construct the FFmpeg command
         command = [
             "ffmpeg",
+            "-avoid_negative_ts", "make_zero",
             "-i",
             input_file,
             "-b:a",
             bitrate,
             "-ar",
             samplerate,
-            "-y",
+            "-map_metadata", "-1", # Remove existing metadata
+            "-c:v", "copy", # Copy video stream without re-encoding
+            "-vn",  # Remove video stream if present
+            "-y", # Overwrite output file
             temp_file.name,
         ]
 

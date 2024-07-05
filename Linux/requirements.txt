@@ -6,4 +6,5 @@ certifi
 pydantic
 ffmpeg-python
 ffmpeg
+mutagen
 -r requirements-dev.txt
