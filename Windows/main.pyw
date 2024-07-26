@@ -1,7 +1,5 @@
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
-from pytube import YouTube
-from pytube.exceptions import VideoUnavailable, RegexMatchError
 from PIL import Image, ImageTk
 import io
 import requests
@@ -16,6 +14,8 @@ import subprocess
 import shutil
 import tempfile
 from mutagen.easyid3 import EasyID3
+import yt_dlp
+import queue
 
 # Ensure that the certifi certificates are used
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -31,34 +31,30 @@ def resource_path(relative_path):
 def add_bitrate_samplerate(input_file, bitrate="320k", samplerate="44100"):
     """Adds bitrate and samplerate to the input file, overwriting the original."""
     try:
-        # Create a temporary file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
         temp_file.close()
 
-        # Construct the FFmpeg command
         command = [
             "ffmpeg",
             "-avoid_negative_ts", "make_zero",
-            "-i",
-            input_file,
-            "-b:a",
-            bitrate,
-            "-ar",
-            samplerate,
-            "-map_metadata", "-1", # Remove existing metadata
-            "-c:v", "copy", # Copy video stream without re-encoding
+            "-i", input_file,
+            "-b:a", bitrate,
+            "-ar", samplerate,
+            "-map_metadata", "-1",
+            "-c:v", "copy",
             "-vn",  # Remove video stream if present
-            "-y", # Overwrite output file
+            "-y",
             temp_file.name,
         ]
 
-        # Run FFmpeg command, suppressing the window
-        subprocess.run(command, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        # Platform-specific handling for hiding the FFmpeg console window
+        if sys.platform.startswith('win'):
+            creationflags = subprocess.CREATE_NO_WINDOW
+        else:
+            creationflags = 0  # No special flags for other platforms
 
-        # Copy the temporary file to the original file's location
+        subprocess.run(command, check=True, creationflags=creationflags)
         shutil.copyfile(temp_file.name, input_file)
-
-        # Delete the temporary file
         os.remove(temp_file.name)
 
         print(f"FFmpeg script executed successfully. File modified: {input_file}")
@@ -73,22 +69,15 @@ class YouTubeDownloader(tk.Tk):
         super().__init__()
         self.title("YouTube Video Downloader")
         self.configure(bg="#2b2b2b")
-        # Window Size
         self.minsize(800, 620)
 
-        # Version Number
-        self.version = "1.4.0"
-
-        # Load Languages
+        self.version = "1.5.0"
         self.languages = languages
         self.current_language = self.load_saved_language() or "English"
 
-        # --- UI Elements ---
         self.create_widgets()
-
-        # Initial Settings
-        self.download_location = self.get_download_location()  # Initialize download location
-        self.video = None
+        self.download_location = self.get_download_location()
+        self.video_info = None
         self.fetch_job = None
         self.start_time = None
         self.total_videos = 0
@@ -96,7 +85,7 @@ class YouTubeDownloader(tk.Tk):
         self.last_downloaded_path = None
         self.downloaded_files = []
         self.download_thread = None
-        self.tagging_progress = tk.IntVar(value=0)  # For tagging progress bar
+        self.tagging_progress = tk.IntVar(value=0)
 
     def create_widgets(self):
         # --- Top Frame (Title, Version, Language) ---
@@ -256,11 +245,22 @@ class YouTubeDownloader(tk.Tk):
             file_tag_button_frame,
             text=self.languages[self.current_language]["tag_list_button"],
             font=("Helvetica", 14),
-            bg="#f44336",
+            bg="#e0d74f",
             fg="white",
             command=self.tag_files_in_directory,
         )
         self.tag_list_button.pack(side=tk.LEFT, padx=10)
+
+        # --- Rename Button ---
+        self.rename_button = tk.Button(
+            file_tag_button_frame,
+            text="Rename M4A to MP3",
+            font=("Helvetica", 14),
+            bg="#9403fc",
+            fg="white",
+            command=self.rename_m4a_to_mp3,
+        )
+        self.rename_button.pack(side=tk.LEFT, padx=10)
 
         # --- Progress and Status Frame ---
         progress_frame = tk.Frame(self, bg="#2b2b2b")
@@ -302,7 +302,7 @@ class YouTubeDownloader(tk.Tk):
             font=("Helvetica", 12),
             bg="#2b2b2b",
             fg="red",
-            wraplength=600  # Wrap long error messages
+            wraplength=600
         )
         self.status_label.pack()
 
@@ -382,6 +382,9 @@ class YouTubeDownloader(tk.Tk):
         self.tagging_progress_label.config(
             text=self.languages[self.current_language]["tagging_progressbar_label"]
         )
+        self.rename_button.config(
+            text=self.languages[self.current_language]["rename_button"]
+        )
 
     def select_all(self, event):
         self.url_entry.select_range(0, tk.END)
@@ -402,26 +405,18 @@ class YouTubeDownloader(tk.Tk):
             return
 
         try:
-            self.video = YouTube(
-                url, on_progress_callback=self.progress_callback
-            )
-            self.show_thumbnail(self.video.thumbnail_url)
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                self.video_info = ydl.extract_info(url, download=False)
+
+            self.show_thumbnail(self.video_info['thumbnail'])
             self.status_label.config(
                 text=self.languages[self.current_language]["fetch_success"],
                 fg="green",
             )
-        except RegexMatchError: # Catch invalid YouTube URL
+        except yt_dlp.DownloadError as e:
             self.thumbnail_label.config(image="")
-            self.status_label.config(
-                text=self.languages[self.current_language]["invalid_url"],
-                fg="red",
-            )
-        except VideoUnavailable:
-            self.thumbnail_label.config(image="")
-            self.status_label.config(
-                text=self.languages[self.current_language]["video_unavailable"],
-                fg="red",
-            )
+            error_message = str(e).split("\n")[0]
+            self.status_label.config(text=error_message, fg="red")
         except Exception as e:
             self.thumbnail_label.config(image="")
             self.status_label.config(
@@ -434,8 +429,7 @@ class YouTubeDownloader(tk.Tk):
         image_data = response.content
         image = Image.open(io.BytesIO(image_data))
 
-        # Resize while maintaining aspect ratio
-        image.thumbnail((320, 240))  # Adjust maximum size as needed
+        image.thumbnail((320, 240))
         thumbnail = ImageTk.PhotoImage(image)
         self.thumbnail_label.config(image=thumbnail)
         self.thumbnail_label.image = thumbnail
@@ -449,7 +443,7 @@ class YouTubeDownloader(tk.Tk):
             )
 
     def get_download_location(self):
-        return os.path.expanduser("~/Downloads")  # Default download location
+        return os.path.expanduser("~/Downloads")
 
     def start_download_thread(self):
         if self.download_thread and self.download_thread.is_alive():
@@ -480,9 +474,9 @@ class YouTubeDownloader(tk.Tk):
         self.download_thread.start()
 
     def download_videos_from_file(self, file_path):
-        download_location = self.download_location  # Use the chosen location
+        download_location = self.download_location
         try:
-            with open(file_path, "r", encoding='utf-8') as file:  # Ensure proper encoding when reading the file
+            with open(file_path, "r", encoding='utf-8') as file:
                 urls = file.readlines()
             self.total_videos = len(urls)
             self.current_video = 0
@@ -493,10 +487,8 @@ class YouTubeDownloader(tk.Tk):
                     try:
                         self.url_entry.delete(0, tk.END)
                         self.url_entry.insert(0, url)
-                        self.fetch_video()
-                        self.video = YouTube(
-                            url, on_progress_callback=self.progress_callback
-                        )
+                        self.fetch_video()  # Fetch video info for the current URL
+
                         self.download_single_video(download_location)
 
                         # Update progress information
@@ -509,10 +501,6 @@ class YouTubeDownloader(tk.Tk):
                         ) * 100
                         self.update_idletasks()
 
-                    except VideoUnavailable:
-                        self.status_label.config(
-                            text=f"Video unavailable: {url}", fg="red"
-                        )
                     except Exception as e:
                         self.status_label.config(
                             text=f"Failed to download: {e}", fg="red"
@@ -529,64 +517,120 @@ class YouTubeDownloader(tk.Tk):
             )
 
     def download_video(self):
-        if not self.video:
+        if not self.video_info:  # Check video_info, not video
             self.status_label.config(
                 text=self.languages[self.current_language]["no_video"], fg="red"
             )
             return
 
-        download_location = self.download_location  # Use the chosen location
+        download_location = self.download_location
 
-        # Create and start the download thread
         self.download_thread = threading.Thread(
             target=self.download_single_video, args=(download_location,)
         )
         self.download_thread.start()
 
     def download_single_video(self, download_location):
+        url = self.url_entry.get()
+        format_choice = self.format_var.get()
+
         try:
             self.start_time = time.time()
-            format_choice = self.format_var.get()
-            if format_choice == "mp4":
-                stream = self.video.streams.get_highest_resolution()
-                output_path = stream.download(output_path=download_location)
-            elif format_choice == "mp3":
-                audio_stream = self.video.streams.filter(only_audio=True).first()
-                output_filename = f"{self.video.title}.mp3"
-                output_path = os.path.join(download_location, output_filename)
-                audio_stream.download(
-                    filename=output_filename, output_path=download_location
+
+            ydl_opts = {
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best' if format_choice == 'mp4' else 'ba[ext=m4a]',
+                'outtmpl': os.path.join(download_location, '%(title)s.%(ext)s'),
+                'progress_hooks': [self.yt_dlp_progress_hook],
+                'quiet': True,
+            }
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+
+            # --- Rename M4A to MP3 in a separate thread using a queue ---
+            if format_choice == 'mp3':
+                rename_queue = queue.Queue()
+
+                def rename_thread(video_info): # Pass video_info to the thread
+                    m4a_file = os.path.join(download_location, f"{video_info['title']}.m4a")
+                    mp3_file = os.path.join(download_location, f"{video_info['title']}.mp3")
+
+                    while not os.path.exists(m4a_file):
+                        time.sleep(1)
+
+                    os.rename(m4a_file, mp3_file)
+                    self.last_downloaded_path = mp3_file
+                    rename_queue.put("rename_done")
+
+                threading.Thread(target=rename_thread, args=(self.video_info,)).start()  # Pass video_info as argument
+
+                def check_rename_queue():
+                    if not rename_queue.empty():
+                        rename_queue.get()
+
+                        # --- Update GUI and proceed with other downloads ---
+                        self.downloaded_files.append(self.last_downloaded_path)
+
+                        if self.tag_after_download_var.get():
+                            self.tag_audio(self.last_downloaded_path)
+
+                        self.status_label.config(
+                            text=f"Downloaded to: {self.last_downloaded_path}",
+                            fg="green"
+                        )
+
+                        self.progress["value"] = 100
+                        self.speed_label.config(text="Speed: 0 MB/s")
+                        self.update_idletasks()
+                    else:
+                        self.after(100, check_rename_queue)
+
+                self.after(100, check_rename_queue)
+
+            else:
+                self.last_downloaded_path = os.path.join(download_location, f"{self.video_info['title']}.mp4")
+                self.downloaded_files.append(self.last_downloaded_path)
+
+                self.status_label.config(
+                    text=f"Downloaded to: {self.last_downloaded_path}",
+                    fg="green"
                 )
-                if self.tag_after_download_var.get():
-                    self.tag_audio(output_path)
-                self.downloaded_files.append(output_path)
 
-            self.last_downloaded_path = output_path
-            self.status_label.config(
-                text=f"Downloaded to: {output_path}", fg="green"
-            )
+                self.progress["value"] = 100
+                self.speed_label.config(text="Speed: 0 MB/s")
+                self.update_idletasks()
 
-            # Update GUI elements
-            self.progress["value"] = 100
-            self.speed_label.config(text="Speed: 0 MB/s")
-            self.update_idletasks()
-
-        except VideoUnavailable:
-            self.status_label.config(
-                text=self.languages[self.current_language]["video_unavailable"],
-                fg="red",
-            )
+        except yt_dlp.DownloadError as e:
+            error_message = str(e).split("\n")[0]
+            self.status_label.config(text=error_message, fg="red")
         except Exception as e:
             self.status_label.config(
                 text=f"Failed to download: {e}", fg="red"
             )
 
+    def rename_m4a_to_mp3(self):
+        directory = filedialog.askdirectory()
+        if not directory:
+            self.status_label.config(text="No directory selected.", fg="red")
+            return
+
+        for filename in os.listdir(directory):
+            if filename.endswith(".m4a"):
+                m4a_path = os.path.join(directory, filename)
+                mp3_path = os.path.join(directory, filename[:-4] + ".mp3")
+                try:
+                    os.rename(m4a_path, mp3_path)
+                    self.status_label.config(
+                        text=f"Renamed {filename} to {filename[:-4] + '.mp3'}", fg="green"
+                    )
+                except OSError as e:
+                    self.status_label.config(text=f"Error renaming {filename}: {e}", fg="red")
 
     def tag_audio(self, output_path):
         if output_path.endswith(".mp3"):
             try:
-                self.add_id3_tags(output_path) # Add ID3 tags first
-                add_bitrate_samplerate(input_file=output_path) # Then handle bitrate and sample rate
+                self.add_id3_tags(output_path)
+                add_bitrate_samplerate(input_file=output_path)
                 self.status_label.config(
                     text=f"Audio tagged: {output_path}", fg="green"
                 )
@@ -601,48 +645,47 @@ class YouTubeDownloader(tk.Tk):
 
     def add_id3_tags(self, file_path):
         try:
-            # Extract artist and title from filename
             filename = os.path.basename(file_path)
             parts = filename.split(" - ")
-            if len(parts) == 2:
-                artist = parts[0].split(" ", 1)[1].strip()  # Remove song number
-                title = parts[1].replace(".mp3", "").strip()
+
+            # --- Handle different filename patterns ---
+            if len(parts) >= 2:  # Check if there's at least one " - " separator
+                artist = parts[0].strip() # Assume artist is before the first " - "
+                title = " - ".join(parts[1:]).replace(".mp3", "").strip()  # Join the rest for the title
 
                 audio = EasyID3(file_path)
                 audio["title"] = title
                 audio["artist"] = artist
                 audio.save()
+            else:
+                print(f"Could not extract artist and title from filename: {filename}")
+
         except Exception as e:
             print(f"Error adding ID3 tags: {e}")
 
-    def progress_callback(self, stream, chunk, bytes_remaining):
-        total_size = stream.filesize
+    def yt_dlp_progress_hook(self, d):
+        if d['status'] == 'downloading':
+            downloaded_bytes = d['downloaded_bytes']
+            total_bytes = d.get('total_bytes', 0)  # Use d.get() to safely get 'total_bytes'
 
-        if bytes_remaining is None:
-            bytes_downloaded = 0
-            percentage_of_completion = 0
-        else:
-            bytes_downloaded = total_size - bytes_remaining
-            percentage_of_completion = (bytes_downloaded / total_size) * 100
+            # Only calculate speed if total_bytes is available
+            if total_bytes > 0:
+                percentage_of_completion = (downloaded_bytes / total_bytes) * 100
+                self.progress["value"] = percentage_of_completion
 
-        if self.start_time is None:
-            self.start_time = time.time()
+                elapsed_time = time.time() - self.start_time
+                download_speed_bps = downloaded_bytes / elapsed_time if elapsed_time > 0 else 0
 
-        elapsed_time = time.time() - self.start_time
-        download_speed_bps = (
-            bytes_downloaded / elapsed_time if elapsed_time > 0 else 0
-        )
+                if download_speed_bps >= 1024 * 1024:
+                    download_speed = download_speed_bps / (1024 * 1024)
+                    speed_unit = "MB/s"
+                else:
+                    download_speed = download_speed_bps / 1024
+                    speed_unit = "KB/s"
 
-        if download_speed_bps >= 1024 * 1024:
-            download_speed = download_speed_bps / (1024 * 1024)
-            speed_unit = "MB/s"
-        else:
-            download_speed = download_speed_bps / 1024
-            speed_unit = "KB/s"
+                self.speed_label.config(text=f"Speed: {download_speed:.2f} {speed_unit}")
 
-        self.progress["value"] = percentage_of_completion
-        self.speed_label.config(text=f"Speed: {download_speed:.2f} {speed_unit}")
-        self.update_idletasks()
+            self.update_idletasks() # Update GUI even if total_bytes is not available
 
     def tag_files_in_directory(self):
         directory = filedialog.askdirectory()
@@ -663,7 +706,7 @@ class YouTubeDownloader(tk.Tk):
             )
             return
 
-        self.current_video = 0 # Reset the current video counter for tagging
+        self.current_video = 0
         for i, filename in enumerate(files_to_tag):
             file_path = os.path.join(directory, filename)
             try:
@@ -677,7 +720,6 @@ class YouTubeDownloader(tk.Tk):
                     text=f"Audio tagging failed: {e}", fg="red"
                 )
 
-            # Update the tagging progress bar
             self.current_video = i + 1
             self.num_videos_label.config(
                 text=f"Videos: {self.current_video}/{total_files}"

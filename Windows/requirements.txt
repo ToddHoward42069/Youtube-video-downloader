@@ -1,5 +1,5 @@
 tk
-pytube
+yt_dlp
 pillow
 requests
 certifi
@@ -7,4 +7,5 @@ pydantic
 ffmpeg-python
 ffmpeg
 mutagen
+queue
 -r requirements-dev.txt

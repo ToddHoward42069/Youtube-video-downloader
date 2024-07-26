@@ -25,6 +25,7 @@ languages = {
         "tag_checkbox_text": "Tag after download",
         "download_progressbar_label": "Download Progress:",
         "tagging_progressbar_label": "Tagging Progress:",
+         "rename_button": "Rename m4a to mp3",
     },
     "Deutsch": {
         "title": "YouTube Video Downloader",
@@ -51,5 +52,6 @@ languages = {
         "tag_checkbox_text": "Nach Download taggen",
         "download_progressbar_label": "Download Fortschritt:",
         "tagging_progressbar_label": "Tagging Fortschritt:",
+        "rename_button": "m4a in mp3 umbenennen",
     },
 }
