@@ -71,9 +71,9 @@ class YouTubeDownloader(tk.Tk):
         self.configure(bg="#2b2b2b")
         self.minsize(800, 620)
 
-        self.version = "1.5.0"
+        self.version = "1.6.0"
         self.languages = languages
-        self.current_language = self.load_saved_language() or "English"
+        self.settings = self.load_settings()
 
         self.create_widgets()
         self.download_location = self.get_download_location()
@@ -87,6 +87,8 @@ class YouTubeDownloader(tk.Tk):
         self.download_thread = None
         self.tagging_progress = tk.IntVar(value=0)
 
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
     def create_widgets(self):
         # --- Top Frame (Title, Version, Language) ---
         top_frame = tk.Frame(self, bg="#2b2b2b")
@@ -94,7 +96,7 @@ class YouTubeDownloader(tk.Tk):
 
         self.title_label = tk.Label(
             top_frame,
-            text=self.languages[self.current_language]["title"],
+            text=self.languages[self.settings["language"]]["title"],
             font=("Helvetica", 24, "bold"),
             bg="#2b2b2b",
             fg="white",
@@ -110,7 +112,7 @@ class YouTubeDownloader(tk.Tk):
         )
         self.version_label.pack(side=tk.RIGHT, padx=10)
 
-        self.language_var = tk.StringVar(value=self.current_language)
+        self.language_var = tk.StringVar(value=self.settings["language"])
         self.language_menu = tk.OptionMenu(
             top_frame,
             self.language_var,
@@ -126,7 +128,7 @@ class YouTubeDownloader(tk.Tk):
 
         self.url_label = tk.Label(
             url_frame,
-            text=self.languages[self.current_language]["url_label"],
+            text=self.languages[self.settings["language"]]["url_label"],
             font=("Helvetica", 14),
             bg="#2b2b2b",
             fg="white",
@@ -154,7 +156,7 @@ class YouTubeDownloader(tk.Tk):
         # Format Options
         self.format_label = tk.Label(
             options_frame,
-            text=self.languages[self.current_language]["format_label"],
+            text=self.languages[self.settings["language"]]["format_label"],
             font=("Helvetica", 14),
             bg="#2b2b2b",
             fg="white",
@@ -187,17 +189,32 @@ class YouTubeDownloader(tk.Tk):
         self.mp3_radio.pack(anchor="w")
 
         # Tag After Download Checkbox
-        self.tag_after_download_var = tk.BooleanVar(value=False)
+        self.tag_after_download_var = tk.BooleanVar(value=self.settings["tag_after_download"])
         self.tag_after_download_checkbox = tk.Checkbutton(
             options_frame,
-            text=self.languages[self.current_language]["tag_checkbox_text"],
+            text=self.languages[self.settings["language"]]["tag_checkbox_text"],
             variable=self.tag_after_download_var,
             bg="#2b2b2b",
             fg="white",
             selectcolor="#2b2b2b",
             font=("Helvetica", 12),  # Larger font
+            command=lambda: self.save_settings({"tag_after_download": self.tag_after_download_var.get()})
         )
         self.tag_after_download_checkbox.pack(pady=10, anchor="w")
+
+        # Rename After Download Checkbox
+        self.rename_after_download_var = tk.BooleanVar(value=self.settings["rename_after_download"])
+        self.rename_after_download_checkbox = tk.Checkbutton(
+            options_frame,
+            text=self.languages[self.settings["language"]]["rename_checkbox_text"],
+            variable=self.rename_after_download_var,
+            bg="#2b2b2b",
+            fg="white",
+            selectcolor="#2b2b2b",
+            font=("Helvetica", 12),  # Larger font
+            command=lambda: self.save_settings({"rename_after_download": self.rename_after_download_var.get()})
+        )
+        self.rename_after_download_checkbox.pack(pady=10, anchor="w")
 
         # --- Download Related Buttons Frame ---
         download_button_frame = tk.Frame(self, bg="#2b2b2b")
@@ -206,7 +223,7 @@ class YouTubeDownloader(tk.Tk):
         # Location Button
         self.location_button = tk.Button(
             download_button_frame,
-            text=self.languages[self.current_language]["location_button"],
+            text=self.languages[self.settings["language"]]["location_button"],
             font=("Helvetica", 14),
             bg="#4CAF50",
             fg="white",
@@ -217,7 +234,7 @@ class YouTubeDownloader(tk.Tk):
         # Download Button
         self.download_button = tk.Button(
             download_button_frame,
-            text=self.languages[self.current_language]["download_button"],
+            text=self.languages[self.settings["language"]]["download_button"],
             font=("Helvetica", 14),
             bg="#008CBA",
             fg="white",
@@ -232,7 +249,7 @@ class YouTubeDownloader(tk.Tk):
         # File Download Button
         self.file_download_button = tk.Button(
             file_tag_button_frame,
-            text=self.languages[self.current_language]["file_download_button"],
+            text=self.languages[self.settings["language"]]["file_download_button"],
             font=("Helvetica", 14),
             bg="#f44336",
             fg="white",
@@ -243,7 +260,7 @@ class YouTubeDownloader(tk.Tk):
         # Tag List Button
         self.tag_list_button = tk.Button(
             file_tag_button_frame,
-            text=self.languages[self.current_language]["tag_list_button"],
+            text=self.languages[self.settings["language"]]["tag_list_button"],
             font=("Helvetica", 14),
             bg="#e0d74f",
             fg="white",
@@ -269,7 +286,7 @@ class YouTubeDownloader(tk.Tk):
         # Download Progress Bar
         self.download_progress_label = tk.Label(
             progress_frame,
-            text=self.languages[self.current_language]["download_progressbar_label"],
+            text=self.languages[self.settings["language"]]["download_progressbar_label"],
             font=("Helvetica", 12),
             bg="#2b2b2b",
             fg="white",
@@ -284,7 +301,7 @@ class YouTubeDownloader(tk.Tk):
         # Tagging Progress Bar
         self.tagging_progress_label = tk.Label(
             progress_frame,
-            text=self.languages[self.current_language]["tagging_progressbar_label"],
+            text=self.languages[self.settings["language"]]["tagging_progressbar_label"],
             font=("Helvetica", 12),
             bg="#2b2b2b",
             fg="white",
@@ -298,7 +315,7 @@ class YouTubeDownloader(tk.Tk):
 
         self.status_label = tk.Label(
             progress_frame,
-            text=self.languages[self.current_language]["status_label"],
+            text=self.languages[self.settings["language"]]["status_label"],
             font=("Helvetica", 12),
             bg="#2b2b2b",
             fg="red",
@@ -312,7 +329,7 @@ class YouTubeDownloader(tk.Tk):
 
         self.speed_label = tk.Label(
             info_frame,
-            text=self.languages[self.current_language]["speed_label"],
+            text=self.languages[self.settings["language"]]["speed_label"],
             font=("Helvetica", 12),
             bg="#2b2b2b",
             fg="white",
@@ -321,7 +338,7 @@ class YouTubeDownloader(tk.Tk):
 
         self.num_videos_label = tk.Label(
             info_frame,
-            text=self.languages[self.current_language]["num_videos_label"],
+            text=self.languages[self.settings["language"]]["num_videos_label"],
             font=("Helvetica", 12),
             bg="#2b2b2b",
             fg="white",
@@ -329,61 +346,66 @@ class YouTubeDownloader(tk.Tk):
         self.num_videos_label.pack(side=tk.LEFT, padx=20)
 
     def change_language(self, lang):
-        self.current_language = lang
+        self.settings["language"] = lang
         self.update_texts()
-        self.save_language_preference(lang)
+        self.save_settings({"language": lang})
 
-    def load_saved_language(self):
+    def load_settings(self):
         try:
-            with open("language_preference.txt", "r") as file:
-                return file.read().strip()
+            with open("settings.txt", "r") as file:
+                settings = eval(file.read())
+                return settings
         except FileNotFoundError:
-            return "English"
+            return {"language": "English", "tag_after_download": False, "rename_after_download": False}
 
-    def save_language_preference(self, lang):
-        with open("language_preference.txt", "w") as file:
-            file.write(lang)
+    def save_settings(self, new_settings):
+        self.settings.update(new_settings)
+        with open("settings.txt", "w") as file:
+            file.write(str(self.settings))
 
     def update_texts(self):
-        self.title(self.languages[self.current_language]["title"])
-        self.title_label.config(text=self.languages[self.current_language]["title"])
-        self.url_label.config(text=self.languages[self.current_language]["url_label"])
+        self.title(self.languages[self.settings["language"]]["title"])
+        self.title_label.config(text=self.languages[self.settings["language"]]["title"])
+        self.url_label.config(text=self.languages[self.settings["language"]]["url_label"])
         self.format_label.config(
-            text=self.languages[self.current_language]["format_label"]
+            text=self.languages[self.settings["language"]]["format_label"]
         )
         self.location_button.config(
-            text=self.languages[self.current_language]["location_button"]
+            text=self.languages[self.settings["language"]]["location_button"]
         )
         self.download_button.config(
-            text=self.languages[self.current_language]["download_button"]
+            text=self.languages[self.settings["language"]]["download_button"]
         )
         self.file_download_button.config(
-            text=self.languages[self.current_language]["file_download_button"]
+            text=self.languages[self.settings["language"]]["file_download_button"]
         )
         self.tag_list_button.config(
-            text=self.languages[self.current_language]["tag_list_button"]
+            text=self.languages[self.settings["language"]]["tag_list_button"]
         )
         self.speed_label.config(
-            text=self.languages[self.current_language]["speed_label"]
+            text=self.languages[self.settings["language"]]["speed_label"]
         )
         self.num_videos_label.config(
-            text=self.languages[self.current_language]["num_videos_label"]
+            text=self.languages[self.settings["language"]]["num_videos_label"]
         )
         self.status_label.config(
-            text=self.languages[self.current_language]["status_label"]
+            text=self.languages[self.settings["language"]]["status_label"]
         )
         self.tag_after_download_checkbox.config(
-            text=self.languages[self.current_language]["tag_checkbox_text"]
+            text=self.languages[self.settings["language"]]["tag_checkbox_text"]
+        )
+        self.rename_after_download_checkbox.config(
+            text=self.languages[self.settings["language"]]["rename_checkbox_text"]
         )
         # Update progress bar labels
         self.download_progress_label.config(
-            text=self.languages[self.current_language]["download_progressbar_label"]
+            text=self.languages[self.settings["language"]]["download_progressbar_label"]
         )
         self.tagging_progress_label.config(
-            text=self.languages[self.current_language]["tagging_progressbar_label"]
+            text=self.languages[self.settings["language"]]["tagging_progressbar_label"]
         )
         self.rename_button.config(
-            text=self.languages[self.current_language]["rename_button"]
+            text=self.languages[self.settings["language"]]["rename_button"]
         )
 
     def select_all(self, event):
@@ -400,7 +422,7 @@ class YouTubeDownloader(tk.Tk):
         url = self.url_entry.get()
         if not url:
             self.status_label.config(
-                text=self.languages[self.current_language]["enter_url"], fg="red"
+                text=self.languages[self.settings["language"]]["enter_url"], fg="red"
             )
             return
 
@@ -410,7 +432,7 @@ class YouTubeDownloader(tk.Tk):
 
             self.show_thumbnail(self.video_info['thumbnail'])
             self.status_label.config(
-                text=self.languages[self.current_language]["fetch_success"],
+                text=self.languages[self.settings["language"]]["fetch_success"],
                 fg="green",
             )
         except yt_dlp.DownloadError as e:
@@ -420,7 +442,7 @@ class YouTubeDownloader(tk.Tk):
         except Exception as e:
             self.thumbnail_label.config(image="")
             self.status_label.config(
-                text=f"{self.languages[self.current_language]['fetch_fail']}{e}",
+                text=f"{self.languages[self.settings["language"]]['fetch_fail']}{e}",
                 fg="red",
             )
 
@@ -463,7 +485,7 @@ class YouTubeDownloader(tk.Tk):
         file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         if not file_path:
             self.status_label.config(
-                text=self.languages[self.current_language]["no_file_selected"],
+                text=self.languages[self.settings["language"]]["no_file_selected"],
                 fg="red",
             )
             return
@@ -506,20 +528,29 @@ class YouTubeDownloader(tk.Tk):
                             text=f"Failed to download: {e}", fg="red"
                         )
             self.status_label.config(
-                text=self.languages[self.current_language]["all_downloads_complete"],
+                text=self.languages[self.settings["language"]]["all_downloads_complete"],
                 fg="green",
             )
             self.speed_label.config(text="Speed: 0 MB/s")
+
+            # Automatically trigger the renaming process after all downloads are complete
+            if self.settings["rename_after_download"]:
+                self.rename_m4a_to_mp3(download_location)
+
+            # Automatically trigger the tagging process after renaming is complete
+            if self.settings["tag_after_download"]:
+                self.tag_files_in_directory(download_location)
+
         except Exception as e:
             self.status_label.config(
-                text=f"{self.languages[self.current_language]['error_reading_file']}{e}",
+                text=f"{self.languages[self.settings["language"]]['error_reading_file']}{e}",
                 fg="red",
             )
 
     def download_video(self):
         if not self.video_info:  # Check video_info, not video
             self.status_label.config(
-                text=self.languages[self.current_language]["no_video"], fg="red"
+                text=self.languages[self.settings["language"]]["no_video"], fg="red"
             )
             return
 
@@ -571,7 +602,7 @@ class YouTubeDownloader(tk.Tk):
                         # --- Update GUI and proceed with other downloads ---
                         self.downloaded_files.append(self.last_downloaded_path)
 
-                        if self.tag_after_download_var.get():
+                        if self.settings["tag_after_download"]:
                             self.tag_audio(self.last_downloaded_path)
 
                         self.status_label.config(
@@ -608,8 +639,7 @@ class YouTubeDownloader(tk.Tk):
                 text=f"Failed to download: {e}", fg="red"
             )
 
-    def rename_m4a_to_mp3(self):
-        directory = filedialog.askdirectory()
+    def rename_m4a_to_mp3(self, directory):
         if not directory:
             self.status_label.config(text="No directory selected.", fg="red")
             return
@@ -625,6 +655,8 @@ class YouTubeDownloader(tk.Tk):
                     )
                 except OSError as e:
                     self.status_label.config(text=f"Error renaming {filename}: {e}", fg="red")
+
+        self.status_label.config(text="Renaming complete.", fg="green")
 
     def tag_audio(self, output_path):
         if output_path.endswith(".mp3"):
@@ -687,11 +719,10 @@ class YouTubeDownloader(tk.Tk):
 
             self.update_idletasks() # Update GUI even if total_bytes is not available
 
-    def tag_files_in_directory(self):
-        directory = filedialog.askdirectory()
+    def tag_files_in_directory(self, directory):
         if not directory:
             self.status_label.config(
-                text=self.languages[self.current_language]["no_directory_selected"],
+                text=self.languages[self.settings["language"]]["no_directory_selected"],
                 fg="red",
             )
             return
@@ -701,7 +732,7 @@ class YouTubeDownloader(tk.Tk):
 
         if total_files == 0:
             self.status_label.config(
-                text=self.languages[self.current_language]["no_mp3_files_found"],
+                text=self.languages[self.settings["language"]]["no_mp3_files_found"],
                 fg="red",
             )
             return
@@ -730,6 +761,10 @@ class YouTubeDownloader(tk.Tk):
 
         self.status_label.config(text="Tagging complete.", fg="green")
 
+    def on_closing(self):
+        if self.download_thread and self.download_thread.is_alive():
+            self.download_thread.join()  # Wait for the download thread to finish
+        self.destroy()
 
 if __name__ == "__main__":
     app = YouTubeDownloader()

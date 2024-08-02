@@ -1,0 +1,1 @@
+{'language': 'Deutsch', 'tag_after_download': True, 'rename_after_download': True}

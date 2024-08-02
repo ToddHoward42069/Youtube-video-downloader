@@ -6,13 +6,13 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=['PIL._imaging', 'PIL', 'pytube', 'requests', 'certifi', 'pydantic', 'ffmpeg', 'ffmpeg_python', 'PIL._tkinter_finder', 'mutagen'],
+    hiddenimports=['PIL._imaging', 'PIL', 'yt_dlp', 'requests', 'certifi', 'pydantic', 'ffmpeg', 'ffmpeg_python', 'PIL._tkinter_finder', 'mutagen', 'mutagen.mp3', 'mutagen.easyid3', 'queue'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=0,
+    optimize=2,
 )
 pyz = PYZ(a.pure)
 
@@ -21,7 +21,7 @@ exe = EXE(
     a.scripts,
     a.binaries,
     a.datas,
-    [],
+    [('O', None, 'OPTION'), ('O', None, 'OPTION')],
     name='Youtube-Video-Downloader',
     debug=False,
     bootloader_ignore_signals=False,

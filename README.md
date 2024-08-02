@@ -1,56 +1,45 @@
-# YouTube Video Downloader
-
-A simple GUI-based YouTube video downloader for Windows built using Python and Tkinter. It allows users to download YouTube videos in MP4 or MP3 format and select the download location. It also supports downloading multiple videos from a text file.
+## YouTube Video Downloader
+A powerful and user-friendly GUI application for downloading YouTube videos on Windows, built with Python and Tkinter.
 
 ## Features
-- Download YouTube videos in MP4 or MP3 format
-- Select the download location
-- Fetch YouTube video thumbnail automatically
-- Download multiple videos from a text file containing YouTube URLs
+- Download YouTube videos in MP4 (video) or MP3 (audio) format
+- Intuitive graphical user interface
+- Custom download location selection
+- Automatic video thumbnail preview
+- Batch download support from a text file containing YouTube URLs
+- Cross-platform compatibility (Windows, Linux)
 
-## Built App
-The pre-built App is located in the output folder and can be executed directly.
+## Installation
+### Pre-built Application
+For Windows and Linux users, a pre-built executable is available in the dist folder. Simply download and run the application without any additional setup.
 
-## Requirements for development
-- Python 3.x
-- pytube package
-- tkinter (included with Python)
-- pillow package
-- requests package
-- certifi package
+## Development Setup
+1. Ensure you have Python 3.x installed on your system.
+
+2. Clone this repository:
+   ```
+   git clone https://github.com/ToddHoward42069/youtube-video-downloader.git
+   cd youtube-video-downloader
+   ```
+
+3. Install the required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
 
 ## Usage
-Install the required packages mentioned above. You can install them using pip:
-```
-pip install pytube pillow requests certifi
-```
-Run `youtube_downloader.py`:
-```
-python youtube_downloader.py
-```
-Enter the YouTube video URL in the text box.
+1. Run the app:
+   ```
+   cd Windows  # or cd Linux
+   python main.pyw
+   ```
 
-Select the desired format: MP4 or MP3.
+2. Enter the YouTube video URL in the provided text box.
 
-Click "Select Download Location" to choose the download folder.
+3. Select your desired format (MP4 or MP3).
 
-Click "Download" to start downloading the video.
+4. Choose the download location by clicking "Select Download Location".
 
-### Downloading Multiple Videos
-Prepare a text file with one YouTube URL per line.
+5. Click "Download" to start the process.
 
-Click "Download from File" in the application.
-
-Select the text file containing YouTube URLs.
-
-The application will download all videos sequentially.
-
-## How do I run the app in docker?
-
-```
-xhost +local:root
-docker run -it --rm --name youtube-downloader -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix youtube-downloader
-```
-
-## License
-This project is released under the MIT License.
+For batch downloads, prepare a text file with one YouTube URL per line and use the batch download option in the application.
